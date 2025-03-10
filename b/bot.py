@@ -101,11 +101,29 @@ async def check_github_updates():
 
 # Function to create GitHub update embed
 def create_github_update_embed(event, repo):
+    # Check if 'created_at' is a valid string
+    created_at = event.get('created_at', '')
+    if not created_at:
+        print(f"Error: 'created_at' is missing or invalid for event: {event}")
+        return Embed(title="Error", description="Missing 'created_at' for event.")
+
+    try:
+        # Print out the created_at to debug
+        print(f"Parsing event timestamp: {created_at}")
+        
+        # Convert 'created_at' string to a datetime object
+        timestamp = datetime.strptime(created_at, '%Y-%m-%dT%H:%M:%SZ')  # Correct use of strptime
+
+    except ValueError as ve:
+        # Handle parsing errors
+        print(f"Error parsing timestamp {created_at}: {ve}")
+        timestamp = datetime.utcnow()  # Default to current UTC time in case of an error
+    
     embed = Embed(
         title=f"GitHub Update: {repo['name']}",
         url=f"https://github.com/{GITHUB_ORG}/{repo['name']}",
         color=0x2F3136,
-        timestamp=datetime.datetime.strptime()(event['created_at'], '%Y-%m-%dT%H:%M:%SZ')
+        timestamp=timestamp  # Use the parsed timestamp here
     )
     
     actor = event['actor']
