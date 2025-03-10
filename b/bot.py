@@ -8,11 +8,8 @@ from discord.ext import commands, tasks
 from discord import Embed, ButtonStyle
 from discord.ui import View, Button
 import datetime
-from github import Github
 import asyncio
-from dotenv import load_dotenv
 
-# GDPM Server Management Bot
 
 WELCOME_CHANNEL_ID = 1348509943203889172
 GITHUB_UPDATES_CHANNEL_ID = 1348508925607018547
@@ -54,8 +51,6 @@ def create_welcome_embed(member):
     
     return embed
 
-
-
 @tasks.loop(minutes=5)
 async def check_github_updates():
     await bot.wait_until_ready()
@@ -79,8 +74,6 @@ async def check_github_updates():
         # Check for updates in each repository
         for repo in repos:
             repo_name = repo['name']
-            # Get the last event time from our storage
-            last_update_time = get_last_update_time(repo_name)
             
             # Fetch events for the repository
             events_url = f"{GITHUB_API_URL}/repos/{GITHUB_ORG}/{repo_name}/events"
@@ -93,22 +86,15 @@ async def check_github_updates():
             events = events_response.json()
             newest_events = []
             
+            # Process events from newest to oldest
             for event in events:
-                # If we've seen this event before, stop checking
-                if last_update_time and event['created_at'] <= last_update_time:
-                    break
-                
                 newest_events.append(event)
             
-            # Process events from oldest to newest
+            # Process events from newest to oldest
             for event in reversed(newest_events):
                 # Create and send embed for the event
                 embed = create_github_update_embed(event, repo)
                 await updates_channel.send(embed=embed)
-            
-            # Update the last event time if we found any new events
-            if newest_events:
-                update_last_update_time(repo_name, newest_events[0]['created_at'])
     
     except Exception as e:
         print(f"Error checking GitHub updates: {e}")
@@ -119,7 +105,7 @@ def create_github_update_embed(event, repo):
         title=f"GitHub Update: {repo['name']}",
         url=f"https://github.com/{GITHUB_ORG}/{repo['name']}",
         color=0x2F3136,
-        timestamp=event['created_at']
+        timestamp=datetime.strptime(event['created_at'], '%Y-%m-%dT%H:%M:%SZ')
     )
     
     actor = event['actor']
@@ -158,7 +144,7 @@ def create_github_update_embed(event, repo):
     embed.set_footer(text=f"GDPM GitHub Tracker • {repo['name']}", icon_url="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png")
     
     return embed
-
+    
 # Staff Commands
 class StaffCommands(commands.Cog):
     def __init__(self, bot):
