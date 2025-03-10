@@ -1,15 +1,16 @@
-# Import the needed libraries
 import os
 import discord
 import aiohttp
 import json
 import requests
+import platform
+import psutil
+import sys
 from discord.ext import commands, tasks
-from discord import Embed, ButtonStyle
+from discord import Embed, ButtonStyle, Activity, ActivityType, Status
 from discord.ui import View, Button
-import datetime
+from datetime import datetime, timedelta
 import asyncio
-
 
 WELCOME_CHANNEL_ID = 1348509943203889172
 GITHUB_UPDATES_CHANNEL_ID = 1348508925607018547
@@ -18,12 +19,13 @@ GITHUB_ORG = "GDMPORG"
 GITHUB_API_URL = 'https://api.github.com'
 GITHUB_HEADERS = {'Accept': 'application/vnd.github.v3+json'}
 
-intents = discord.Intents.default()
+intents = discord.Intents.all()
 intents.members = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix='$', intents=intents)
-  
+bot.remove_command("help")
+
 # Bot event: Member Join
 @bot.event
 async def on_member_join(member):
@@ -50,6 +52,9 @@ def create_welcome_embed(member):
     embed.set_footer(text=f"Member #{len(member.guild.members)}", icon_url=member.guild.icon.url if member.guild.icon else None)
     
     return embed
+
+# Dictionary to track sent events
+sent_events = {}
 
 @tasks.loop(minutes=5)
 async def check_github_updates():
@@ -92,9 +97,32 @@ async def check_github_updates():
             
             # Process events from newest to oldest
             for event in reversed(newest_events):
-                # Create and send embed for the event
+                # Check if event was already sent or is older than 10 minutes
+                event_id = event['id']
+                created_at = event.get('created_at', '')
+                if not created_at:
+                    print(f"Error: 'created_at' is missing or invalid for event: {event}")
+                    continue
+                
+                # Parse the event timestamp
+                try:
+                    timestamp = datetime.strptime(created_at, '%Y-%m-%dT%H:%M:%SZ')
+                except ValueError as ve:
+                    print(f"Error parsing timestamp {created_at}: {ve}")
+                    timestamp = datetime.datetime.utcnow()  # Default to current UTC time in case of an error
+                
+                # Check if event is older than 10 minutes or already sent
+                current_time = datetime.datetime.utcnow()
+                time_difference = current_time - timestamp
+                if event_id in sent_events or time_difference > timedelta(minutes=10):
+                    continue
+                
+                # Send the event if it hasn't been sent yet and is recent enough
                 embed = create_github_update_embed(event, repo)
                 await updates_channel.send(embed=embed)
+                
+                # Add the event to the sent_events dictionary with the current timestamp
+                sent_events[event_id] = current_time
     
     except Exception as e:
         print(f"Error checking GitHub updates: {e}")
@@ -112,12 +140,12 @@ def create_github_update_embed(event, repo):
         print(f"Parsing event timestamp: {created_at}")
         
         # Convert 'created_at' string to a datetime object
-        timestamp = datetime.datetime.strptime(created_at, '%Y-%m-%dT%H:%M:%SZ')  # Correct use of strptime
+        timestamp = datetime.strptime(created_at, '%Y-%m-%dT%H:%M:%SZ')  # Correct use of strptime
 
     except ValueError as ve:
         # Handle parsing errors
         print(f"Error parsing timestamp {created_at}: {ve}")
-        timestamp = datetime.utcnow()  # Default to current UTC time in case of an error
+        timestamp = datetime.datetime.utcnow()  # Default to current UTC time in case of an error
     
     embed = Embed(
         title=f"GitHub Update: {repo['name']}",
@@ -161,7 +189,7 @@ def create_github_update_embed(event, repo):
     embed.set_footer(text=f"GDPM GitHub Tracker • {repo['name']}", icon_url="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png")
     
     return embed
-    
+
 # Staff Commands
 class StaffCommands(commands.Cog):
     def __init__(self, bot):
@@ -196,11 +224,113 @@ class StaffCommands(commands.Cog):
         embed.add_field(name="`$banlogshow`", value="Display the ban logs", inline=False)
         embed.add_field(name="`$lockchannel <option> <channelID>`", value="Lock a channel", inline=False)
         embed.add_field(name="`$timeout <user> <time> <toJson/toDict> <reason>`", value="Timeout a user", inline=False)
+        embed.add_field(name="`$sys --b`", value="Display detailed system information", inline=False)
         
         embed.set_footer(text="Only users with administrator permissions can use these commands")
         
         await ctx.send(embed=embed)
     
+    @commands.command(name="sys")
+    async def system_info(self, ctx, flag=None):
+        if flag != "--b":
+            return await ctx.send("Please use `$sys --b` to get system information.")
+        
+        # Get system information
+        try:
+            # Create system info embed
+            embed = Embed(
+                title="System Information",
+                description="Detailed information about the system running the bot",
+                color=0x00FF00,
+                timestamp=datetime.datetime.utcnow()
+            )
+            
+            # System information
+            embed.add_field(
+                name="System",
+                value=f"OS: {platform.system()} {platform.release()}\n"
+                      f"Version: {platform.version()}\n"
+                      f"Architecture: {platform.machine()}\n"
+                      f"Processor: {platform.processor()}",
+                inline=False
+            )
+            
+            # Python information
+            embed.add_field(
+                name="Python",
+                value=f"Version: {platform.python_version()}\n"
+                      f"Implementation: {platform.python_implementation()}\n"
+                      f"Compiler: {platform.python_compiler()}\n"
+                      f"Build: {' '.join(platform.python_build())}",
+                inline=False
+            )
+            
+            # Discord.py information
+            embed.add_field(
+                name="Discord.py",
+                value=f"Version: {discord.__version__}",
+                inline=False
+            )
+            
+            # Memory usage
+            process = psutil.Process(os.getpid())
+            memory_usage = process.memory_info().rss / 1024 / 1024  # Convert to MB
+            
+            embed.add_field(
+                name="Resource Usage",
+                value=f"Memory: {memory_usage:.2f} MB\n"
+                      f"CPU Usage: {psutil.cpu_percent()}%\n"
+                      f"Available Memory: {psutil.virtual_memory().available / 1024 / 1024:.2f} MB / {psutil.virtual_memory().total / 1024 / 1024:.2f} MB\n"
+                      f"Disk Usage: {psutil.disk_usage('/').percent}%",
+                inline=False
+            )
+            
+            # Network information
+            if hasattr(psutil, 'net_if_addrs'):
+                network_info = psutil.net_if_addrs()
+                network_text = ""
+                for interface, addresses in network_info.items():
+                    for address in addresses:
+                        if address.family == psutil.AF_LINK:
+                            network_text += f"Interface: {interface}, MAC: {address.address}\n"
+                        elif address.family == 2:  # IPv4
+                            network_text += f"Interface: {interface}, IPv4: {address.address}\n"
+                
+                embed.add_field(
+                    name="Network",
+                    value=network_text if network_text else "No network information available",
+                    inline=False
+                )
+            
+            # Bot information
+            uptime = datetime.datetime.utcnow() - datetime.fromtimestamp(process.create_time())
+            hours, remainder = divmod(int(uptime.total_seconds()), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            
+            embed.add_field(
+                name="Bot Information",
+                value=f"Username: {bot.user.name}\n"
+                      f"ID: {bot.user.id}\n"
+                      f"Uptime: {hours}h {minutes}m {seconds}s\n"
+                      f"Guilds: {len(bot.guilds)}\n"
+                      f"Latency: {round(bot.latency * 1000)}ms",
+                inline=False
+            )
+            
+            # API information
+            embed.add_field(
+                name="API Information",
+                value=f"API Ping: {round(bot.latency * 1000)}ms\n"
+                      f"API Version: {discord.version_info}\n"
+                      f"Gateway Version: {discord.gateway.DiscordWebSocket.GATEWAY_VERSION}",
+                inline=False
+            )
+            
+            await ctx.send(embed=embed)
+            
+        except Exception as e:
+            await ctx.send(f"An error occurred while fetching system information: {e}")
+
     @commands.command(name="ban")
     async def ban(self, ctx, user: discord.Member, *, reason="No reason provided"):
         try:
@@ -228,7 +358,7 @@ class StaffCommands(commands.Cog):
                 "moderator_id": ctx.author.id,
                 "moderator_name": ctx.author.name,
                 "reason": reason,
-                "timestamp": datetime.datetime.utcnow().isoformat()
+                "timestamp": datetime.datetime.datetime.utcnow().isoformat()
             })
             
         except discord.Forbidden:
@@ -278,7 +408,7 @@ class StaffCommands(commands.Cog):
             title="Ban Logs",
             description=f"Showing {len(self.ban_logs)} ban entries",
             color=0x2F3136,
-            timestamp=datetime.datetime.utcnow()
+            timestamp=datetime.datetime.datetime.utcnow()
         )
         
         embed.set_author(name=bot.user.name, icon_url=bot.user.avatar.url if bot.user.avatar else None)
@@ -353,7 +483,7 @@ class StaffCommands(commands.Cog):
                 return await ctx.send("Invalid time format. Use format like 30s, 5m, 2h, 1d.")
         
         # Calculate timeout end time
-        timeout_until = datetime.datetime.utcnow() + datetime.timedelta(seconds=duration)
+        timeout_until = datetime.datetime.datetime.utcnow() + datetime.timedelta(seconds=duration)
         
         try:
             # Apply timeout
@@ -418,13 +548,183 @@ class MemberCommands(commands.Cog):
         embed.set_author(name="GDPM Server Management", icon_url=bot.user.avatar.url if bot.user.avatar else None)
         
         embed.add_field(name="`$membercount`", value="Show current member count", inline=False)
-        embed.add_field(name="`$avatar`", value="Display your avatar or another user's avatar", inline=False)
+        embed.add_field(name="`$avatar <user>`", value="Display your avatar or another user's avatar", inline=False)
         embed.add_field(name="`$links`", value="Display important links", inline=False)
-        
+        embed.add_field(name="`$snipe <numback>`", value=" Check the most recent deleted message or a specefic message.", inline=False)
+        embed.add_field(name="`$esnipe <numback>`", value="Check the most recent edited message or an older edit.", inline=False)
+        embed.add_field(name="`$serverinfo`", value="Display server statistics", inline=False)
+
         embed.set_footer(text="GDPM Server Management")
         
         await ctx.send(embed=embed)
     
+def __init__(self, bot):
+    self.bot = bot
+    # Add these lines to track deleted and edited messages
+    self.deleted_messages = {}  # {channel_id: [message1, message2, ...]}
+    self.edited_messages = {}   # {channel_id: [{"before": message1, "after": message2}, ...]}
+
+# Add this to capture deleted messages
+@commands.Cog.listener()
+async def on_message_delete(self, message):
+    if message.author.bot:
+        return
+    
+    channel_id = message.channel.id
+    if channel_id not in self.deleted_messages:
+        self.deleted_messages[channel_id] = []
+    
+    # Store message information
+    msg_data = {
+        "content": message.content,
+        "author": message.author,
+        "timestamp": message.created_at,
+        "attachments": [a.url for a in message.attachments],
+        "embeds": message.embeds
+    }
+    
+    # Add to the beginning of the list (most recent first)
+    self.deleted_messages[channel_id].insert(0, msg_data)
+    
+    # Keep only the last 10 deleted messages per channel
+    if len(self.deleted_messages[channel_id]) > 10:
+        self.deleted_messages[channel_id].pop()
+
+# Add this to capture edited messages
+@commands.Cog.listener()
+async def on_message_edit(self, before, after):
+    if before.author.bot:
+        return
+    
+    # Ignore if content didn't change
+    if before.content == after.content:
+        return
+        
+    channel_id = before.channel.id
+    if channel_id not in self.edited_messages:
+        self.edited_messages[channel_id] = []
+    
+    # Store message information
+    edit_data = {
+        "before": {
+            "content": before.content,
+            "timestamp": before.created_at,
+        },
+        "after": {
+            "content": after.content,
+            "timestamp": after.edited_at,
+        },
+        "author": before.author,
+        "url": after.jump_url
+    }
+    
+    # Add to the beginning of the list (most recent first)
+    self.edited_messages[channel_id].insert(0, edit_data)
+    
+    # Keep only the last 10 edited messages per channel
+    if len(self.edited_messages[channel_id]) > 10:
+        self.edited_messages[channel_id].pop()
+
+@commands.command(name="snipe")
+async def snipe(self, ctx, num_back: int = 1):
+    """Show the most recently deleted message in the channel"""
+    channel_id = ctx.channel.id
+    
+    # Check if there are deleted messages in this channel
+    if channel_id not in self.deleted_messages or not self.deleted_messages[channel_id]:
+        return await ctx.send("No recently deleted messages found in this channel.")
+    
+    # Validate the num_back parameter
+    if num_back < 1:
+        return await ctx.send("Please provide a positive number.")
+    
+    if num_back > len(self.deleted_messages[channel_id]):
+        return await ctx.send(f"Only {len(self.deleted_messages[channel_id])} deleted messages are stored for this channel.")
+    
+    # Get the requested deleted message
+    msg_data = self.deleted_messages[channel_id][num_back - 1]
+    
+    # Create embed
+    embed = Embed(
+        title="Deleted Message",
+        description=msg_data["content"] or "*No content*",
+        color=0xFF5555,
+        timestamp=msg_data["timestamp"]
+    )
+    
+    embed.set_author(
+        name=f"{msg_data['author'].name}#{msg_data['author'].discriminator}",
+        icon_url=msg_data['author'].avatar.url if msg_data['author'].avatar else msg_data['author'].default_avatar.url
+    )
+    
+    # Add attachments if any
+    if msg_data["attachments"]:
+        embed.add_field(
+            name="Attachments",
+            value="\n".join(msg_data["attachments"]),
+            inline=False
+        )
+    
+    # Add footer
+    embed.set_footer(text=f"Deleted message {num_back}/{len(self.deleted_messages[channel_id])}")
+    
+    await ctx.send(embed=embed)
+
+@commands.command(name="esnipe")
+async def esnipe(self, ctx, num_back: int = 1):
+    """Show the most recently edited message in the channel"""
+    channel_id = ctx.channel.id
+    
+    # Check if there are edited messages in this channel
+    if channel_id not in self.edited_messages or not self.edited_messages[channel_id]:
+        return await ctx.send("No recently edited messages found in this channel.")
+    
+    # Validate the num_back parameter
+    if num_back < 1:
+        return await ctx.send("Please provide a positive number.")
+    
+    if num_back > len(self.edited_messages[channel_id]):
+        return await ctx.send(f"Only {len(self.edited_messages[channel_id])} edited messages are stored for this channel.")
+    
+    # Get the requested edited message
+    edit_data = self.edited_messages[channel_id][num_back - 1]
+    
+    # Create embed
+    embed = Embed(
+        title="Edited Message",
+        color=0x5865F2,
+        timestamp=edit_data["after"]["timestamp"]
+    )
+    
+    embed.set_author(
+        name=f"{edit_data['author'].name}#{edit_data['author'].discriminator}",
+        icon_url=edit_data['author'].avatar.url if edit_data['author'].avatar else edit_data['author'].default_avatar.url
+    )
+    
+    embed.add_field(
+        name="Before",
+        value=edit_data["before"]["content"] or "*No content*",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="After",
+        value=edit_data["after"]["content"] or "*No content*",
+        inline=False
+    )
+    
+    # Add link to the message
+    embed.add_field(
+        name="Jump to Message",
+        value=f"[Click here]({edit_data['url']})",
+        inline=False
+    )
+    
+    # Add footer
+    embed.set_footer(text=f"Edited message {num_back}/{len(self.edited_messages[channel_id])}")
+    
+    await ctx.send(embed=embed)
+
     @commands.command(name="membercount")
     async def membercount(self, ctx):
         member_count = ctx.guild.member_count
@@ -485,6 +785,98 @@ class MemberCommands(commands.Cog):
         embed.set_footer(text="GDPM Server Management")
         
         await ctx.send(embed=embed, view=view)
+
+    @commands.command(name="serverinfo")
+    async def serverinfo(self, ctx):
+        guild = ctx.guild
+        
+        # Get server creation date and calculate age
+        created_at = guild.created_at
+        server_age = datetime.datetime.utcnow() - created_at
+        
+        # Count channels by type
+        text_channels = len(guild.text_channels)
+        voice_channels = len(guild.voice_channels)
+        categories = len(guild.categories)
+        
+        # Count roles and emojis
+        roles_count = len(guild.roles) - 1  # Subtract @everyone
+        emojis_count = len(guild.emojis)
+        
+        # Get member counts
+        total_members = guild.member_count
+        bot_count = sum(1 for member in guild.members if member.bot)
+        human_count = total_members - bot_count
+        
+        # Get online members count
+        online_members = sum(1 for member in guild.members if member.status != discord.Status.offline and not member.bot)
+        
+        # Security level
+        verification_level = str(guild.verification_level).title()
+        
+        # Create embed
+        embed = Embed(
+            title=f"{guild.name} Server Information",
+            description=guild.description or "No server description",
+            color=0x5865F2,
+            timestamp=datetime.datetime.utcnow()
+        )
+        
+        # Set server icon as thumbnail
+        if guild.icon:
+            embed.set_thumbnail(url=guild.icon.url)
+        
+        # General information
+        embed.add_field(
+            name="General",
+            value=f"📅 Created: {created_at.strftime('%b %d, %Y')}\n"
+                  f"⏰ Age: {server_age.days} days\n"
+                  f"👑 Owner: {guild.owner.mention}\n"
+                  f"🔒 Verification: {verification_level}\n"
+                  f"🌐 Region: {str(guild.region).title() if hasattr(guild, 'region') else 'Automatic'}\n"
+                  f"🏷️ ID: {guild.id}",
+            inline=True
+        )
+        
+        # Stats
+        embed.add_field(
+            name="Stats",
+            value=f"👥 Members: {total_members:,}\n"
+                  f"👤 Humans: {human_count:,}\n"
+                  f"🤖 Bots: {bot_count:,}\n"
+                  f"📢 Channels: {text_channels + voice_channels:,}\n"
+                  f"📜 Roles: {roles_count:,}\n"
+                  f"😀 Emojis: {emojis_count:,}",
+            inline=True
+        )
+        
+        # Channels
+        embed.add_field(
+            name="Channels",
+            value=f"💬 Text: {text_channels:,}\n"
+                  f"🔊 Voice: {voice_channels:,}\n"
+                  f"📁 Categories: {categories:,}",
+            inline=True
+        )
+        
+        # Server features
+        if guild.features:
+            feature_list = ", ".join(f"`{feature.replace('_', ' ').title()}`" for feature in guild.features)
+            embed.add_field(
+                name="Features",
+                value=feature_list,
+                inline=False
+            )
+        
+        # Online members
+        embed.add_field(
+            name="Online Members",
+            value=f"🟢 Online: {online_members:,}",
+            inline=False
+        )
+        
+        # Send embed
+        await ctx.send(embed=embed)
 
 async def setup():
     await bot.add_cog(StaffCommands(bot))
