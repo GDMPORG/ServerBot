@@ -12,6 +12,7 @@ from github import Github
 import asyncio
 from dotenv import load_dotenv
 
+# GDPM Server Management Bot
 
 WELCOME_CHANNEL_ID = 1348509943203889172
 GITHUB_UPDATES_CHANNEL_ID = 1348508925607018547
