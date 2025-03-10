@@ -105,7 +105,7 @@ def create_github_update_embed(event, repo):
         title=f"GitHub Update: {repo['name']}",
         url=f"https://github.com/{GITHUB_ORG}/{repo['name']}",
         color=0x2F3136,
-        timestamp=datetime.strptime(event['created_at'], '%Y-%m-%dT%H:%M:%SZ')
+        timestamp=datetime.datetime.strptime()(event['created_at'], '%Y-%m-%dT%H:%M:%SZ')
     )
     
     actor = event['actor']
