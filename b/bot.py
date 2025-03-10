@@ -358,7 +358,7 @@ class StaffCommands(commands.Cog):
                 "moderator_id": ctx.author.id,
                 "moderator_name": ctx.author.name,
                 "reason": reason,
-                "timestamp": datetime.datetime.datetime.utcnow().isoformat()
+                "timestamp": datetime.datetime.utcnow().isoformat()
             })
             
         except discord.Forbidden:
@@ -408,7 +408,7 @@ class StaffCommands(commands.Cog):
             title="Ban Logs",
             description=f"Showing {len(self.ban_logs)} ban entries",
             color=0x2F3136,
-            timestamp=datetime.datetime.datetime.utcnow()
+            timestamp=datetime.datetime.utcnow()
         )
         
         embed.set_author(name=bot.user.name, icon_url=bot.user.avatar.url if bot.user.avatar else None)
@@ -483,7 +483,7 @@ class StaffCommands(commands.Cog):
                 return await ctx.send("Invalid time format. Use format like 30s, 5m, 2h, 1d.")
         
         # Calculate timeout end time
-        timeout_until = datetime.datetime.datetime.utcnow() + datetime.timedelta(seconds=duration)
+        timeout_until = datetime.datetime.utcnow() + datetime.timedelta(seconds=duration)
         
         try:
             # Apply timeout
