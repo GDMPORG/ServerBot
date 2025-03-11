@@ -9,7 +9,9 @@ import sys
 from discord.ext import commands, tasks
 from discord import Embed, ButtonStyle, Activity, ActivityType, Status
 from discord.ui import View, Button
-from datetime import datetime, timedelta
+import datetime
+from datetime import timedelta
+from datetime import datetime
 import asyncio
 
 WELCOME_CHANNEL_ID = 1348509943203889172
@@ -40,7 +42,7 @@ def create_welcome_embed(member):
         title=f"Welcome to the Server, {member.name}!",
         description=f"Thank you for joining our community, {member.mention}. We're glad to have you here!",
         color=0x2F3136,
-        timestamp=datetime.datetime.utcnow()
+        timestamp=datetime.utcnow()
     )
     
     embed.set_thumbnail(url=member.avatar.url if member.avatar else member.default_avatar.url)
@@ -214,7 +216,7 @@ class StaffCommands(commands.Cog):
             title="Staff Commands",
             description="Here are the commands available to staff members:",
             color=0x2F3136,
-            timestamp=datetime.datetime.utcnow()
+            timestamp=datetime.utcnow()
         )
         
         embed.set_author(name="GDPM Server Management", icon_url=bot.user.avatar.url if bot.user.avatar else None)
@@ -242,7 +244,7 @@ class StaffCommands(commands.Cog):
                 title="System Information",
                 description="Detailed information about the system running the bot",
                 color=0x00FF00,
-                timestamp=datetime.datetime.utcnow()
+                timestamp=datetime.utcnow()
             )
             
             # System information
@@ -303,7 +305,7 @@ class StaffCommands(commands.Cog):
                 )
             
             # Bot information
-            uptime = datetime.datetime.utcnow() - datetime.fromtimestamp(process.create_time())
+            uptime = datetime.utcnow() - datetime.fromtimestamp(process.create_time())
             hours, remainder = divmod(int(uptime.total_seconds()), 3600)
             minutes, seconds = divmod(remainder, 60)
             
@@ -321,10 +323,10 @@ class StaffCommands(commands.Cog):
             embed.add_field(
                 name="API Information",
                 value=f"API Ping: {round(bot.latency * 1000)}ms\n"
-                      f"API Version: {discord.version_info}\n"
-                      f"Gateway Version: {discord.gateway.DiscordWebSocket.GATEWAY_VERSION}",
+                       f"API Version: {discord.__version__}\n",  # Corrected to get the version properly
                 inline=False
-            )
+)
+
             
             await ctx.send(embed=embed)
             
@@ -341,7 +343,7 @@ class StaffCommands(commands.Cog):
                 title="User Banned",
                 description=f"{user.mention} has been banned from the server.",
                 color=0xFF0000,
-                timestamp=datetime.datetime.utcnow()
+                timestamp=datetime.utcnow()
             )
             
             embed.set_author(name=bot.user.name, icon_url=bot.user.avatar.url if bot.user.avatar else None)
@@ -358,7 +360,7 @@ class StaffCommands(commands.Cog):
                 "moderator_id": ctx.author.id,
                 "moderator_name": ctx.author.name,
                 "reason": reason,
-                "timestamp": datetime.datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat()
             })
             
         except discord.Forbidden:
@@ -408,13 +410,13 @@ class StaffCommands(commands.Cog):
             title="Ban Logs",
             description=f"Showing {len(self.ban_logs)} ban entries",
             color=0x2F3136,
-            timestamp=datetime.datetime.utcnow()
+            timestamp=datetime.utcnow()
         )
         
         embed.set_author(name=bot.user.name, icon_url=bot.user.avatar.url if bot.user.avatar else None)
         
         for i, entry in enumerate(self.ban_logs):
-            ban_time = datetime.datetime.fromisoformat(entry["timestamp"])
+            ban_time = datetime.fromisoformat(entry["timestamp"])
             embed.add_field(
                 name=f"Ban #{i+1}",
                 value=f"User: {entry['user_name']} ({entry['user_id']})\n"
@@ -450,7 +452,7 @@ class StaffCommands(commands.Cog):
                 title="Channel Locked",
                 description=f"{channel.mention} has been locked. Members cannot send messages.",
                 color=0xFF0000,
-                timestamp=datetime.datetime.utcnow()
+                timestamp=datetime.utcnow()
             )
             
             embed.set_author(name=bot.user.name, icon_url=bot.user.avatar.url if bot.user.avatar else None)
@@ -483,7 +485,7 @@ class StaffCommands(commands.Cog):
                 return await ctx.send("Invalid time format. Use format like 30s, 5m, 2h, 1d.")
         
         # Calculate timeout end time
-        timeout_until = datetime.datetime.utcnow() + datetime.timedelta(seconds=duration)
+        timeout_until = datetime.utcnow() + datetime.timedelta(seconds=duration)
         
         try:
             # Apply timeout
@@ -494,7 +496,7 @@ class StaffCommands(commands.Cog):
                 title="User Timed Out",
                 description=f"{user.mention} has been timed out.",
                 color=0xFFA500,
-                timestamp=datetime.datetime.utcnow()
+                timestamp=datetime.utcnow()
             )
             
             embed.set_author(name=bot.user.name, icon_url=bot.user.avatar.url if bot.user.avatar else None)
@@ -514,7 +516,7 @@ class StaffCommands(commands.Cog):
                     "moderator_name": ctx.author.name,
                     "duration": time,
                     "reason": reason,
-                    "timestamp": datetime.datetime.utcnow().isoformat(),
+                    "timestamp": datetime.utcnow().isoformat(),
                     "expires": timeout_until.isoformat()
                 }
                 
@@ -542,7 +544,7 @@ class MemberCommands(commands.Cog):
             title="Member Commands",
             description="Here are the commands available to all members:",
             color=0x2F3136,
-            timestamp=datetime.datetime.utcnow()
+            timestamp=datetime.utcnow()
         )
         
         embed.set_author(name="GDPM Server Management", icon_url=bot.user.avatar.url if bot.user.avatar else None)
@@ -557,7 +559,170 @@ class MemberCommands(commands.Cog):
         embed.set_footer(text="GDPM Server Management")
         
         await ctx.send(embed=embed)
+
+    @commands.command(name="membercount")
+    async def membercount(self, ctx):
+        member_count = ctx.guild.member_count
+        
+        embed = Embed(
+            title="Server Member Count",
+            description=f"There are currently **{member_count}** members in this server.",
+            color=0x2F3136,
+            timestamp=datetime.utcnow()
+        )
+        
+        embed.set_author(name=ctx.guild.name, icon_url=ctx.guild.icon.url if ctx.guild.icon else None)
+        embed.set_footer(text="GDPM Server Management")
+        
+        await ctx.send(embed=embed)
     
+    @commands.command(name="avatar")
+    async def avatar(self, ctx, user: discord.User = None):
+        # If no user is specified, use the command author
+        user = user or ctx.author
+        
+        embed = Embed(
+            title=f"{user.name}'s Avatar",
+            color=0x2F3136,
+            timestamp=datetime.utcnow()
+        )
+        
+        # Get the avatar URL (or default avatar if none)
+        avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
+        
+        embed.set_image(url=avatar_url)
+        embed.set_footer(text="GDPM Server Management")
+        
+        await ctx.send(embed=embed)
+    
+    @commands.command(name="links")
+    async def links(self, ctx):
+        embed = Embed(
+            title="Important Links",
+            description="Here are important links for our community:",
+            color=0x2F3136,
+            timestamp=datetime.utcnow()
+        )
+        
+        embed.set_author(name="GDPM Server Management", icon_url=bot.user.avatar.url if bot.user.avatar else None)
+        
+        # Create view with buttons
+        view = View()
+        
+        # GitHub button
+        github_button = Button(
+            label="GitHub",
+            url="https://github.com/GDMPORG",
+            style=ButtonStyle.link
+        )
+        view.add_item(github_button)
+
+        embed.set_footer(text="GDPM Server Management")
+        
+        await ctx.send(embed=embed, view=view)
+
+# Member Commands
+class Misc(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.command(name="serverinfo")
+    async def serverinfo(self, ctx):
+        guild = ctx.guild
+        
+        # Get server creation date and calculate age
+        created_at = guild.created_at
+
+        from datetime import timezone # only used here to be honest
+        
+        # Make `utcnow()` aware by adding the UTC timezone
+        server_age = datetime.utcnow().replace(tzinfo=timezone.utc) - created_at
+
+        
+        # Count channels by type
+        text_channels = len(guild.text_channels)
+        voice_channels = len(guild.voice_channels)
+        categories = len(guild.categories)
+        
+        # Count roles and emojis
+        roles_count = len(guild.roles) - 1  # Subtract @everyone
+        emojis_count = len(guild.emojis)
+        
+        # Get member counts
+        total_members = guild.member_count
+        bot_count = sum(1 for member in guild.members if member.bot)
+        human_count = total_members - bot_count
+        
+        # Get online members count
+        online_members = sum(1 for member in guild.members if member.status != discord.Status.offline and not member.bot)
+        
+        # Security level
+        verification_level = str(guild.verification_level).title()
+        
+        # Create embed
+        embed = Embed(
+            title=f"{guild.name} Server Information",
+            description=guild.description or "No server description",
+            color=0x5865F2,
+            timestamp=datetime.utcnow()
+        )
+        
+        # Set server icon as thumbnail
+        if guild.icon:
+            embed.set_thumbnail(url=guild.icon.url)
+        
+        # General information
+        embed.add_field(
+            name="General",
+            value=f"📅 Created: {created_at.strftime('%b %d, %Y')}\n"
+                  f"⏰ Age: {server_age.days} days\n"
+                  f"👑 Owner: {guild.owner.mention}\n"
+                  f"🔒 Verification: {verification_level}\n"
+                  f"🌐 Region: {str(guild.region).title() if hasattr(guild, 'region') else 'Automatic'}\n"
+                  f"🏷️ ID: {guild.id}",
+            inline=True
+        )
+        
+        # Stats
+        embed.add_field(
+            name="Stats",
+            value=f"👥 Members: {total_members:,}\n"
+                  f"👤 Humans: {human_count:,}\n"
+                  f"🤖 Bots: {bot_count:,}\n"
+                  f"📢 Channels: {text_channels + voice_channels:,}\n"
+                  f"📜 Roles: {roles_count:,}\n"
+                  f"😀 Emojis: {emojis_count:,}",
+            inline=True
+        )
+        
+        # Channels
+        embed.add_field(
+            name="Channels",
+            value=f"💬 Text: {text_channels:,}\n"
+                  f"🔊 Voice: {voice_channels:,}\n"
+                  f"📁 Categories: {categories:,}",
+            inline=True
+        )
+        
+        # Server features
+        if guild.features:
+            feature_list = ", ".join(f"`{feature.replace('_', ' ').title()}`" for feature in guild.features)
+            embed.add_field(
+                name="Features",
+                value=feature_list,
+                inline=False
+            )
+        
+        # Online members
+        embed.add_field(
+            name="Online Members",
+            value=f"🟢 Online: {online_members:,}",
+            inline=False
+        )
+        
+        # Send embed
+        await ctx.send(embed=embed)
+
 def __init__(self, bot):
     self.bot = bot
     # Add these lines to track deleted and edited messages
@@ -725,162 +890,11 @@ async def esnipe(self, ctx, num_back: int = 1):
     
     await ctx.send(embed=embed)
 
-    @commands.command(name="membercount")
-    async def membercount(self, ctx):
-        member_count = ctx.guild.member_count
-        
-        embed = Embed(
-            title="Server Member Count",
-            description=f"There are currently **{member_count}** members in this server.",
-            color=0x2F3136,
-            timestamp=datetime.datetime.utcnow()
-        )
-        
-        embed.set_author(name=ctx.guild.name, icon_url=ctx.guild.icon.url if ctx.guild.icon else None)
-        embed.set_footer(text="GDPM Server Management")
-        
-        await ctx.send(embed=embed)
-    
-    @commands.command(name="avatar")
-    async def avatar(self, ctx, user: discord.User = None):
-        # If no user is specified, use the command author
-        user = user or ctx.author
-        
-        embed = Embed(
-            title=f"{user.name}'s Avatar",
-            color=0x2F3136,
-            timestamp=datetime.datetime.utcnow()
-        )
-        
-        # Get the avatar URL (or default avatar if none)
-        avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
-        
-        embed.set_image(url=avatar_url)
-        embed.set_footer(text="GDPM Server Management")
-        
-        await ctx.send(embed=embed)
-    
-    @commands.command(name="links")
-    async def links(self, ctx):
-        embed = Embed(
-            title="Important Links",
-            description="Here are important links for our community:",
-            color=0x2F3136,
-            timestamp=datetime.datetime.utcnow()
-        )
-        
-        embed.set_author(name="GDPM Server Management", icon_url=bot.user.avatar.url if bot.user.avatar else None)
-        
-        # Create view with buttons
-        view = View()
-        
-        # GitHub button
-        github_button = Button(
-            label="GitHub",
-            url="https://github.com/GDMPORG",
-            style=ButtonStyle.link
-        )
-        view.add_item(github_button)
-
-        embed.set_footer(text="GDPM Server Management")
-        
-        await ctx.send(embed=embed, view=view)
-
-    @commands.command(name="serverinfo")
-    async def serverinfo(self, ctx):
-        guild = ctx.guild
-        
-        # Get server creation date and calculate age
-        created_at = guild.created_at
-        server_age = datetime.datetime.utcnow() - created_at
-        
-        # Count channels by type
-        text_channels = len(guild.text_channels)
-        voice_channels = len(guild.voice_channels)
-        categories = len(guild.categories)
-        
-        # Count roles and emojis
-        roles_count = len(guild.roles) - 1  # Subtract @everyone
-        emojis_count = len(guild.emojis)
-        
-        # Get member counts
-        total_members = guild.member_count
-        bot_count = sum(1 for member in guild.members if member.bot)
-        human_count = total_members - bot_count
-        
-        # Get online members count
-        online_members = sum(1 for member in guild.members if member.status != discord.Status.offline and not member.bot)
-        
-        # Security level
-        verification_level = str(guild.verification_level).title()
-        
-        # Create embed
-        embed = Embed(
-            title=f"{guild.name} Server Information",
-            description=guild.description or "No server description",
-            color=0x5865F2,
-            timestamp=datetime.datetime.utcnow()
-        )
-        
-        # Set server icon as thumbnail
-        if guild.icon:
-            embed.set_thumbnail(url=guild.icon.url)
-        
-        # General information
-        embed.add_field(
-            name="General",
-            value=f"📅 Created: {created_at.strftime('%b %d, %Y')}\n"
-                  f"⏰ Age: {server_age.days} days\n"
-                  f"👑 Owner: {guild.owner.mention}\n"
-                  f"🔒 Verification: {verification_level}\n"
-                  f"🌐 Region: {str(guild.region).title() if hasattr(guild, 'region') else 'Automatic'}\n"
-                  f"🏷️ ID: {guild.id}",
-            inline=True
-        )
-        
-        # Stats
-        embed.add_field(
-            name="Stats",
-            value=f"👥 Members: {total_members:,}\n"
-                  f"👤 Humans: {human_count:,}\n"
-                  f"🤖 Bots: {bot_count:,}\n"
-                  f"📢 Channels: {text_channels + voice_channels:,}\n"
-                  f"📜 Roles: {roles_count:,}\n"
-                  f"😀 Emojis: {emojis_count:,}",
-            inline=True
-        )
-        
-        # Channels
-        embed.add_field(
-            name="Channels",
-            value=f"💬 Text: {text_channels:,}\n"
-                  f"🔊 Voice: {voice_channels:,}\n"
-                  f"📁 Categories: {categories:,}",
-            inline=True
-        )
-        
-        # Server features
-        if guild.features:
-            feature_list = ", ".join(f"`{feature.replace('_', ' ').title()}`" for feature in guild.features)
-            embed.add_field(
-                name="Features",
-                value=feature_list,
-                inline=False
-            )
-        
-        # Online members
-        embed.add_field(
-            name="Online Members",
-            value=f"🟢 Online: {online_members:,}",
-            inline=False
-        )
-        
-        # Send embed
-        await ctx.send(embed=embed)
-
+    # ^ Misc Cog End
 async def setup():
     await bot.add_cog(StaffCommands(bot))
     await bot.add_cog(MemberCommands(bot))
+    await bot.add_cog(Misc(bot))
 
 @bot.event
 async def on_ready():
